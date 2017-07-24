@@ -6,24 +6,6 @@ var SEGMENT_COLORS = [
 	'#a65628'
 ];
 
-function calcDistance(point1, point2) {
-	function toRadians(angle) {
-		return angle * Math.PI / 180;
-	}
-
-	var R = 6371e3;
-	var fi1 = toRadians(point1.lat), lambda1 = toRadians(point1.lon);
-	var fi2 = toRadians(point2.lat), lambda2 = toRadians(point2.lon);
-	var dFi = fi2 - fi1;
-	var dLambda = lambda2 - lambda1;
-
-	var a = Math.sin(dFi / 2) * Math.sin(dFi / 2)
-		+ Math.cos(fi1) * Math.cos(fi2)
-		* Math.sin(dLambda / 2) * Math.sin(dLambda / 2);
-	var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-	return R * c;
-}
-
 function updateSegmentAttributes(segment) {
 	segment.distance = 0;
 	segment.enabled = true;
@@ -172,15 +154,21 @@ function genChartData(segments) {
 	return data;
 }
 
-function getPosition(segments, row, column) {
-	var maxRow = 0;
-	var segmentId = column - 1;
-	for (var i = 0; i < segmentId; i += 1) {
-		if (segments[i].enabled) {
-			maxRow += segments[i].length - 1;
+function getPosition(segments, row) {
+	row += 1;
+	var segmentId = 0;
+	var pointId;
+	while (true) {
+		var segment = segments[segmentId];
+		if (segment.enabled) {
+			if (row < segment.length) {
+				pointId = row;
+				break;
+			}
+			row -= segment.length - 1;
 		}
+		segmentId += 1;
 	}
-	var pointId = row - maxRow + 1;
 	var point = JSON.parse(JSON.stringify(segments[segmentId][pointId]));
 	point.segmentId = segmentId;
 	point.pointId = pointId;
@@ -197,7 +185,12 @@ function drawChart(elementId, segments, map) {
 
 		var options = {
 			colors: SEGMENT_COLORS,
+			crosshair: {
+				orientation: 'vertical',
+				trigger: 'focus'
+			},
 			curveType: 'function',
+			focusTarget: 'category',
 			legend: {
 				position: 'none'
 			},
@@ -211,27 +204,36 @@ function drawChart(elementId, segments, map) {
 
 		var chart = new google.visualization.LineChart(document.getElementById(elementId));
 
+
+		function selectSplitPoint() {
+			deselectSegment();
+			var point = chart.getSelection()[0];
+			if (!point) {
+				return;
+			}
+			var position = getPosition(segments, point.row);
+			selectSegment(position.segmentId);
+			var $a = $('<a href="#split">Split segment here</a>');
+			$a.attr('data-segment-id', position.segmentId);
+			$a.attr('data-point-id', position.pointId);
+			L.popup().setLatLng([position.lat, position.lon])
+				.setContent($('<p></p>').html($a)[0].outerHTML)
+				.openOn(map);
+		}
+
 		chart.draw(data, options);
 		google.visualization.events.addListener(chart, 'onmouseover', function (point) {
-			var position = getPosition(segments, point.row, point.column);
+			if (!point) {
+				return;
+			}
+			var position = getPosition(segments, point.row);
 			L.popup().setLatLng([position.lat, position.lon])
 				.setContent('<p>Here</p>')
 				.openOn(map);
 		});
-		google.visualization.events.addListener(chart, 'select', function (point) {
-			deselectSegment();
-			point = chart.getSelection()[0];
-			if (point) {
-				var position = getPosition(segments, point.row, point.column);
-				selectSegment(position.segmentId);
-				var $a = $('<a href="#split">Split segment here</a>');
-				$a.attr('data-segment-id', position.segmentId);
-				$a.attr('data-point-id', position.pointId);
-				L.popup().setLatLng([position.lat, position.lon])
-					.setContent($('<p></p>').html($a)[0].outerHTML)
-					.openOn(map);
-			}
-		});
+
+		google.visualization.events.addListener(chart, 'select', selectSplitPoint);
+		$(document.getElementById(elementId)).on('mouseleave', selectSplitPoint);
 
 		$(window).on('resize', function () {
 			chart.draw(data, options);
@@ -307,8 +309,8 @@ function initUI(gpxInput) {
 		var segmentId = $this.attr('data-segment-id');
 		var pointId = $this.attr('data-point-id');
 		var segmentToSplit = segments[segmentId];
-		var splitSegmentLeft = segmentToSplit .slice(0, pointId);
-		var splitSegmentRight = segmentToSplit .slice(pointId);
+		var splitSegmentLeft = segmentToSplit.slice(0, pointId);
+		var splitSegmentRight = segmentToSplit.slice(pointId);
 
 		updateSegmentAttributes(splitSegmentLeft);
 		updateSegmentAttributes(splitSegmentRight);

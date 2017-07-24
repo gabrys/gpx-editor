@@ -21,8 +21,8 @@
     <div class="container">
         <div class="left-column">
             <p>
-                <a class="btn btn-primary" download="generated.gpx" href="javascript:;" id="download-gpx">Download
-                    GPX</a>
+                <a class="btn btn-primary" download="generated.gpx" href="javascript:;" id="download-gpx">
+                    Download GPX</a>
                 <a class="btn btn-default" href="">Back</a>
             </p>
             <table id="split-table" class="table">
@@ -74,7 +74,7 @@
 
     #input-gpx {
         border: 3px dashed #ccc;
-        padding: calc(50vh - 8em) 0;
+        padding: calc(50vh - 8em) calc(50% - 160px);
         margin-top: 4em;
         text-align: center;
         width: 100%;
@@ -163,5 +163,6 @@
 </style>
 
 <script src="gpx.js"></script>
+<script src="gps-distance.js"></script>
 <script src="editor.js"></script>
 </html>
